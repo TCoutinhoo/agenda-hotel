@@ -1,1 +1,268 @@
-index.html
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agenda Hotel</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+
+    h1, h2 {
+      color: #1f2937;
+    }
+
+    .card {
+      background: white;
+      padding: 16px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    form {
+      display: grid;
+      gap: 12px;
+    }
+
+    label {
+      font-weight: bold;
+      color: #374151;
+    }
+
+    input, textarea, button {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+
+    button {
+      background: #2563eb;
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    button:hover {
+      background: #1d4ed8;
+    }
+
+    .grupo-item {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 10px;
+      background: #fafafa;
+    }
+
+    .mensagem {
+      padding: 10px;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      display: none;
+    }
+
+    .sucesso {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .erro {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    .loading {
+      color: #6b7280;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+  <h1>Agenda do Hotel</h1>
+
+  <div class="card">
+    <h2>Cadastrar grupo</h2>
+
+    <div id="mensagem" class="mensagem"></div>
+
+    <form id="grupoForm">
+      <div>
+        <label for="nome">Nome do grupo</label>
+        <input type="text" id="nome" required />
+      </div>
+
+      <div>
+        <label for="guia">Nome do guia</label>
+        <input type="text" id="guia" />
+      </div>
+
+      <div>
+        <label for="dataEntrada">Data de entrada</label>
+        <input type="date" id="dataEntrada" required />
+      </div>
+
+      <div>
+        <label for="dataSaida">Data de saída</label>
+        <input type="date" id="dataSaida" required />
+      </div>
+
+      <div>
+        <label for="pessoas">Número de pessoas</label>
+        <input type="number" id="pessoas" min="1" required />
+      </div>
+
+      <div>
+        <label for="valorPessoa">Valor por pessoa</label>
+        <input type="number" id="valorPessoa" min="0" step="0.01" required />
+      </div>
+
+      <div>
+        <label for="observacoes">Observações</label>
+        <textarea id="observacoes" rows="4"></textarea>
+      </div>
+
+      <button type="submit">Salvar grupo</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>Grupos cadastrados</h2>
+    <div id="listaGrupos" class="loading">Carregando grupos...</div>
+  </div>
+
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
+
+    // =====================================================
+    // 1) COLE AQUI OS DADOS DO SEU PROJETO SUPABASE
+    // =====================================================
+    const SUPABASE_URL = 'COLE_AQUI_SUA_URL'
+    const SUPABASE_ANON_KEY = 'COLE_AQUI_SUA_ANON_KEY'
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+
+    const grupoForm = document.getElementById('grupoForm')
+    const listaGrupos = document.getElementById('listaGrupos')
+    const mensagem = document.getElementById('mensagem')
+
+    function mostrarMensagem(texto, tipo) {
+      mensagem.textContent = texto
+      mensagem.className = `mensagem ${tipo}`
+      mensagem.style.display = 'block'
+
+      setTimeout(() => {
+        mensagem.style.display = 'none'
+      }, 4000)
+    }
+
+    function formatarData(data) {
+      if (!data) return '-'
+      const [ano, mes, dia] = data.split('-')
+      return `${dia}/${mes}/${ano}`
+    }
+
+    function formatarMoeda(valor) {
+      const numero = Number(valor || 0)
+      return numero.toLocaleString('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+      })
+    }
+
+    async function listarGrupos() {
+      listaGrupos.innerHTML = '<div class="loading">Carregando grupos...</div>'
+
+      const { data, error } = await supabase
+        .from('grupos')
+        .select('*')
+        .order('data_entrada', { ascending: true })
+
+      if (error) {
+        console.error('Erro ao listar grupos:', error)
+        listaGrupos.innerHTML = `<div style="color:red;">Erro ao carregar grupos: ${error.message}</div>`
+        return
+      }
+
+      if (!data || data.length === 0) {
+        listaGrupos.innerHTML = '<p>Nenhum grupo cadastrado ainda.</p>'
+        return
+      }
+
+      listaGrupos.innerHTML = ''
+
+      data.forEach((grupo) => {
+        const div = document.createElement('div')
+        div.className = 'grupo-item'
+        div.innerHTML = `
+          <strong>${grupo.nome}</strong><br>
+          Guia: ${grupo.guia || '-'}<br>
+          Período: ${formatarData(grupo.data_entrada)} até ${formatarData(grupo.data_saida)}<br>
+          Pessoas: ${grupo.numero_pessoas ?? '-'}<br>
+          Valor por pessoa: ${formatarMoeda(grupo.valor_por_pessoa)}<br>
+          Observações: ${grupo.observacoes || '-'}
+        `
+        listaGrupos.appendChild(div)
+      })
+    }
+
+    grupoForm.addEventListener('submit', async (event) => {
+      event.preventDefault()
+
+      const nome = document.getElementById('nome').value.trim()
+      const guia = document.getElementById('guia').value.trim()
+      const dataEntrada = document.getElementById('dataEntrada').value
+      const dataSaida = document.getElementById('dataSaida').value
+      const pessoas = document.getElementById('pessoas').value
+      const valorPessoa = document.getElementById('valorPessoa').value
+      const observacoes = document.getElementById('observacoes').value.trim()
+
+      if (!nome || !dataEntrada || !dataSaida || !pessoas || !valorPessoa) {
+        mostrarMensagem('Preencha os campos obrigatórios.', 'erro')
+        return
+      }
+
+      if (dataSaida < dataEntrada) {
+        mostrarMensagem('A data de saída não pode ser menor que a data de entrada.', 'erro')
+        return
+      }
+
+      const novoGrupo = {
+        nome: nome,
+        guia: guia,
+        data_entrada: dataEntrada,
+        data_saida: dataSaida,
+        numero_pessoas: Number(pessoas),
+        valor_por_pessoa: Number(valorPessoa),
+        observacoes: observacoes
+      }
+
+      const { error } = await supabase
+        .from('grupos')
+        .insert([novoGrupo])
+        .select()
+
+      if (error) {
+        console.error('Erro ao salvar grupo:', error)
+        mostrarMensagem(`Erro ao salvar: ${error.message}`, 'erro')
+        return
+      }
+
+      mostrarMensagem('Grupo salvo com sucesso!', 'sucesso')
+      grupoForm.reset()
+      listarGrupos()
+    })
+
+    listarGrupos()
+  </script>
+</body>
+</html>
